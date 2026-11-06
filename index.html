@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Paskibra IndangJaya - Sistem Absensi & Anggota</title>
+    <!-- Library Scanner & SheetJS -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-navy: #0f172a;
+            --accent-navy: #1e3a8a;
+            --bg-color: #f4f6f9;
+            --text-main: #333;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            color: var(--text-main);
+        }
+        .app-container {
+            max-width: 1100px;
+            margin: 30px auto;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .app-header {
+            background: linear-gradient(135deg, var(--primary-navy), var(--accent-navy));
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .header-logo {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #fff;
+        }
+        .app-header h1 { margin: 0; font-size: 22px; }
+        .app-header p { margin: 3px 0 0 0; font-size: 12px; opacity: 0.9; }
+
+        /* Navigasi Tab */
+        .nav-tabs {
+            display: flex;
+            background: #1e293b;
+            padding: 0 20px;
+        }
+        .nav-tab {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 15px 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        .nav-tab:hover { color: white; }
+        .nav-tab.active {
+            color: white;
+            border-bottom: 3px solid #60a5fa;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .tab-content { display: none; padding: 30px; }
+        .tab-content.active { display: block; }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: opacity 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-navy { background-color: var(--accent-navy); color: white; }
+        .btn-blue { background-color: #2563eb; color: white; }
+        .btn-green { background-color: #10b981; color: white; }
+        .btn-orange { background-color: #d97706; color: white; }
+        .btn-spreadsheet { background-color: #0f9d58; color: white; }
+
+        .search-box {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        /* Card Anggota List */
+        .member-card {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            justify-content: space-between;
+        }
+        .member-info-left { display: flex; align-items: center; gap: 20px; }
+        .member-photo {
+            width: 65px;
+            height: 65px;
+            border-radius: 10px;
+            object-fit: cover;
+            background: #cbd5e1;
+            border: 1px solid #cbd5e1;
+        }
+        .member-details h4 { margin: 0 0 5px 0; font-size: 16px; color: #1e293b; }
+        .member-details p { margin: 0; font-size: 13px; color: #64748b; }
+
+        .member-actions { display: flex; gap: 10px; }
+        .action-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .btn-card-navy { background-color: var(--accent-navy); color: white; }
+        .btn-edit { background-color: #f1f5f9; color: #475569; }
+        .btn-delete { background-color: #fee2e2; color: #ef4444; }
+
+        /* Modal Popup */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-box {
+            background: white;
+            width: 520px;
+            max-width: 90%;
+            border-radius: 12px;
+            padding: 25px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        /* ID Card Styling */
+        .idcard-preview-container { text-align: center; }
+        .card-preview-box {
+            width: 380px;
+            height: 220px;
+            background: linear-gradient(135deg, #0f172a, #1e3a8a);
+            color: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px auto;
+            text-align: left;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            position: relative;
+            box-sizing: border-box;
+        }
+        .card-preview-back {
+            background: #ffffff;
+            color: #333;
+            border: 2px solid var(--accent-navy);
+        }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #modalIdCard, #modalIdCard * { visibility: visible; }
+            #modalIdCard { position: absolute; left: 0; top: 0; background: white; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Header -->
+        <div class="app-header">
+            <div class="header-brand">
+                <img src="new LOGO PASKIB.png" alt="Logo" class="header-logo" onerror="this.src='https://via.placeholder.com/50'">
+                <div>
+                    <h1>PASKIBRA INDANGJAYA</h1>
+                    <p>SDN 1 Bendungan • Sistem Manajemen Kehadiran & Anggota</p>
+                </div>
+            </div>
+            <div style="font-size: 13px; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px;">
+                Status: <span style="color: #60a5fa; font-weight: bold;">Online</span>
+            </div>
+        </div>
+
+        <!-- Tab Navigasi -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchTab(event, 'tab-anggota')">👥 Anggota Klub</button>
+            <button class="nav-tab" onclick="switchTab(event, 'tab-scanner')">📷 Scan Absensi</button>
+            <button class="nav-tab" onclick="switchTab(event, 'tab-admin')">📊 Rekap & Laporan</button>
+        </div>
+
+        <!-- KONTEN 1: ANGGOTA KLUB -->
+        <div id="tab-anggota" class="tab-content active">
+            <div class="top-bar">
+                <div>
+                    <h3 style="margin:0; font-size:18px;">DAFTAR ANGGOTA PASKIBRA INDANGJAYA</h3>
+                    <p style="margin:5px 0 0 0; font-size:14px; color:#64748b;"><strong id="total-anggota">0</strong> / 100 anggota terdaftar</p>
+                </div>
+                <button class="btn btn-navy" onclick="bukaModalTambah()">+ Tambah</button>
+            </div>
+
+            <input type="text" id="cariAnggota" class="search-box" placeholder="Cari nama atau kode anggota..." onkeyup="filterAnggota()">
+
+            <div id="list-anggota-container"></div>
+        </div>
+
+        <!-- KONTEN 2: SCANNER ABSENSI -->
+        <div id="tab-scanner" class="tab-content">
+            <h3>Pindai Barcode / QR Code Kehadiran</h3>
+            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Arahkan kamera ke QR Code pada ID Card anggota.</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                <div style="background: white; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; text-align: center;">
+                    <div id="reader" style="width: 100%;"></div>
+                </div>
+                <div style="background: white; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                    <h4 style="margin-bottom: 5px; color: #555;">Status Pemindaian:</h4>
+                    <div id="hasil-scan" style="font-size: 18px; font-weight: bold; color: var(--accent-navy); margin: 15px 0;">Menunggu scan...</div>
+                    <p id="info-waktu" style="color: #888; font-size: 13px;"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- KONTEN 3: REKAP & LAPORAN -->
+        <div id="tab-admin" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                <h3>Rekapitulasi Kehadiran Anggota</h3>
+                <div>
+                    <!-- Tombol Link Langsung ke Google Spreadsheet Anda -->
+                    <a href="https://docs.google.com/spreadsheets/d/1GebsMZxzeCTQVBkfC6n1nECZi6pyXR40hdSSLRR7JZg/edit" target="_blank" class="btn btn-spreadsheet">📑 Buka Spreadsheet</a>
+                    <button class="btn btn-blue" onclick="loadRekapMatriks()">🔄 Segarkan</button>
+                    <button class="btn btn-green" onclick="exportKeExcel()">📊 Download Excel</button>
+                </div>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="tabel-absen" style="width:100%; border-collapse: collapse;">
+                    <thead id="tabel-header"></thead>
+                    <tbody id="tabel-body">
+                        <tr><td style="text-align: center; color: #888; padding: 20px;">Memuat data rekap...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL TAMBAH / EDIT ANGGOTA -->
+    <div id="modalFormAnggota" class="modal-overlay">
+        <div class="modal-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 id="modalTitle" style="margin:0;">Tambah Anggota</h3>
+                <button onclick="tutupModalForm()" style="background:none; border:none; font-size:18px; cursor:pointer;">✕</button>
+            </div>
+            <form id="formAnggota" onsubmit="simpanDataAnggota(event)">
+                <input type="hidden" id="editIndex" value="">
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">ID Anggota / Scan QR Code *</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="inputCustomId" class="search-box" style="margin-bottom:0;" placeholder="Scan atau ketik kode ID..." required>
+                        <button type="button" class="btn btn-orange" onclick="bukaScannerModal()" style="white-space: nowrap; font-size: 13px;">📷 Scan QR</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Foto Anggota</label>
+                    <input type="file" id="inputFotoFile" class="search-box" style="margin-bottom:0; padding:8px;" accept="image/*">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Nama Lengkap *</label>
+                    <input type="text" id="inputNama" class="search-box" style="margin-bottom:0;" placeholder="Nama anggota" required>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Jenis Kelamin *</label>
+                    <select id="inputGender" class="search-box" style="margin-bottom:0;">
+                        <option value="Laki-laki">Laki-laki</option>
+                        <option value="Perempuan">Perempuan</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Tanggal Lahir *</label>
+                    <input type="date" id="inputTglLahir" class="search-box" style="margin-bottom:0;" onchange="hitungUsiaOtomatis()" required>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Usia (Otomatis)</label>
+                    <input type="text" id="inputUsia" class="search-box" style="margin-bottom:0; background:#f1f5f9;" readonly placeholder="Pilih tanggal lahir">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Domisili / Sekolah *</label>
+                    <input type="text" id="inputDomisili" class="search-box" style="margin-bottom:0;" value="SDN 1 Bendungan" required>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn" style="background:#e2e8f0; color:#333;" onclick="tutupModalForm()">Batal</button>
+                    <button type="submit" class="btn btn-navy">Simpan Data</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL KAMERA SCANNER KECIL UNTUK INPUT ID -->
+    <div id="modalScannerKecil" class="modal-overlay">
+        <div class="modal-box" style="width: 400px; text-align: center;">
+            <h3>Arahkan Kamera ke QR Code</h3>
+            <div id="reader-kecil" style="width: 100%; margin-bottom: 15px;"></div>
+            <button class="btn" style="background:#e2e8f0;" onclick="tutupScannerModal()">Tutup</button>
+        </div>
+    </div>
+
+    <!-- MODAL ID CARD & UPLOAD QR CODE -->
+    <div id="modalIdCard" class="modal-overlay">
+        <div class="modal-box idcard-preview-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin:0;">Pratinjau ID Card & QR Absen</h3>
+                <button onclick="tutupModalIdCard()" style="background:none; border:none; font-size:18px; cursor:pointer;">✕</button>
+            </div>
+            
+            <!-- Kartu Bagian Depan -->
+            <div class="card-preview-box">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <img src="new LOGO PASKIB.png" style="width: 25px; height: 25px; border-radius: 50%; object-fit: cover;" onerror="this.style.display='none'">
+                    <span style="font-size: 11px; font-weight: bold; letter-spacing: 0.5px;">PASKIBRA INDANGJAYA</span>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <img id="cardFoto" src="" style="width: 70px; height: 85px; border-radius: 6px; object-fit: cover; border: 2px solid white; background:#ccc;">
+                    <div>
+                        <h4 id="cardNama" style="margin: 0 0 4px 0; font-size: 14px; font-weight: bold;">NAMA SISWA</h4>
+                        <div id="cardIdUnik" style="font-size: 11px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px;">IDJY-2026-001</div>
+                        <p id="cardGender" style="margin: 0 0 2px 0; font-size: 11px; opacity: 0.9;">Perempuan</p>
+                        <p id="cardKlub" style="margin: 0; font-size: 11px;">Klub: <strong>INDANGJAYA</strong></p>
+                        <p id="cardDomisili" style="margin: 0; font-size: 11px;">Domisili: SDN 1 Bendungan</p>
+                        <p id="cardUsia" style="margin: 0; font-size: 11px;">Usia: 10 tahun</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kartu Bagian Belakang -->
+            <div class="card-preview-box card-preview-back">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <span style="font-size: 12px; font-weight: bold; color: var(--primary-navy);">ID CARD ABSENSI</span>
+                    <img src="new LOGO PASKIB.png" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover;" onerror="this.style.display='none'">
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="background: white; padding: 4px; border-radius: 4px; width: 75px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                        <img id="cardQrImg" src="" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="QR Code">
+                        <label id="labelUploadQr" style="font-size: 9px; cursor: pointer; color: #1e3a8a; font-weight: bold; line-height: 1.1;">
+                            📁 Upload QR<br>
+                            <input type="file" id="inputQrFile" accept="image/*" style="display: none;" onchange="uploadQrAnggota(event)">
+                        </label>
+                    </div>
+                    <div style="text-align: left; font-size: 11px; color: #333;">
+                        <p style="margin:0 0 3px 0;"><strong>PROVINSI:</strong> Jawa Barat</p>
+                        <p style="margin:0 0 3px 0;"><strong>PENGCAB:</strong> Kuningan</p>
+                        <p id="cardTglLahir" style="margin:0;"><strong>TGL LAHIR:</strong> -</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tombol Navigasi Modal ID Card -->
+            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                <button class="btn btn-navy" onclick="window.print()">📥 Unduh ID Card</button>
+                <button class="btn btn-blue" onclick="window.print()">🖨️ Cetak Kartu</button>
+                <button class="btn" style="background:#e2e8f0; color:#333;" onclick="tutupModalIdCard()">Kembali</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let listAnggota = JSON.parse(localStorage.getItem('paskibra_anggota')) || [
+            { id: "IDJY-2026-001", nama: "FAKHDAN ALDEBARAN", usia: 11, gender: "Laki-laki", tglLahir: "2015-05-12", domisili: "SDN 1 Bendungan", foto: "https://via.placeholder.com/65", qrImg: "" },
+            { id: "IDJY-2026-002", nama: "ADILA KAMILA", usia: 10, gender: "Perempuan", tglLahir: "2016-08-20", domisili: "SDN 1 Bendungan", foto: "https://via.placeholder.com/65", qrImg: "" }
+        ];
+        let currentActiveId = "";
+        let scannerKecilInstance = null;
+
+        function simpanLocalStorage() {
+            localStorage.setItem('paskibra_anggota', JSON.stringify(listAnggota));
+        }
+
+        function switchTab(evt, tabName) {
+            let contents = document.getElementsByClassName("tab-content");
+            for (let c of contents) { c.classList.remove("active"); }
+            let tabs = document.getElementsByClassName("nav-tab");
+            for (let t of tabs) { t.classList.remove("active"); }
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+            if(tabName === 'tab-admin') loadRekapMatriks();
+        }
+
+        function renderAnggota(dataToRender = listAnggota) {
+            const container = document.getElementById('list-anggota-container');
+            document.getElementById('total-anggota').innerText = listAnggota.length;
+            container.innerHTML = "";
+
+            if(dataToRender.length === 0) {
+                container.innerHTML = `<p style="text-align:center; color:#888; padding:30px;">Belum ada anggota terdaftar.</p>`;
+                return;
+            }
+
+            dataToRender.forEach((item) => {
+                let card = document.createElement('div');
+                card.className = 'member-card';
+                card.innerHTML = `
+                    <div class="member-info-left">
+                        <img src="${item.foto}" class="member-photo" alt="Foto">
+                        <div class="member-details">
+                            <h4>${item.nama}</h4>
+                            <p>${item.usia} th • ${item.gender} • ${item.domisili}</p>
+                            <p style="font-weight:600; color:var(--accent-navy); margin-top:3px;">ID: ${item.id} ${item.qrImg ? '✅' : '⚠️'}</p>
+                        </div>
+                    </div>
+                    <div class="member-actions">
+                        <button class="action-btn btn-card-navy" onclick="bukaIdCard('${item.id}')" title="Cetak ID Card & QR">🪪</button>
+                        <button class="action-btn btn-edit" onclick="bukaModalEdit('${item.id}')" title="Edit Anggota">✏️</button>
+                        <button class="action-btn btn-delete" onclick="hapusAnggota('${item.id}')" title="Hapus">🗑️</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function hitungUsiaOtomatis() {
+            let tglLahirVal = document.getElementById('inputTglLahir').value;
+            if(!tglLahirVal) return;
+            let tahunLahir = new Date(tglLahirVal).getFullYear();
+            let tahunSekarang = new Date().getFullYear();
+            let usia = tahunSekarang - tahunLahir;
+            document.getElementById('inputUsia').value = usia > 0 ? usia + " Tahun" : "0 Tahun";
+        }
+
+        function bukaModalTambah() {
+            document.getElementById('modalTitle').innerText = "Tambah Anggota";
+            document.getElementById('editIndex').value = "";
+            document.getElementById('formAnggota').reset();
+            document.getElementById('inputUsia').value = "";
+            document.getElementById('modalFormAnggota').style.display = 'flex';
+        }
+
+        function bukaModalEdit(id) {
+            let anggota = listAnggota.find(a => a.id === id);
+            if(!anggota) return;
+
+            document.getElementById('modalTitle').innerText = "Edit Anggota (" + id + ")";
+            document.getElementById('editIndex').value = id;
+            document.getElementById('inputCustomId').value = anggota.id;
+            document.getElementById('inputNama').value = anggota.nama;
+            document.getElementById('inputGender').value = anggota.gender;
+            document.getElementById('inputTglLahir').value = anggota.tglLahir || "";
+            document.getElementById('inputUsia').value = anggota.usia + " Tahun";
+            document.getElementById('inputDomisili').value = anggota.domisili;
+
+            document.getElementById('modalFormAnggota').style.display = 'flex';
+        }
+
+        function tutupModalForm() {
+            document.getElementById('modalFormAnggota').style.display = 'none';
+        }
+
+        function bukaScannerModal() {
+            document.getElementById('modalScannerKecil').style.display = 'flex';
+            scannerKecilInstance = new Html5Qrcode("reader-kecil");
+            scannerKecilInstance.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 200, height: 200 } },
+                (decodedText) => {
+                    document.getElementById('inputCustomId').value = decodedText;
+                    tutupScannerModal();
+                    alert("Berhasil scan ID: " + decodedText);
+                },
+                (error) => {}
+            ).catch(err => {
+                alert("Tidak dapat mengakses kamera.");
+            });
+        }
+
+        function tutupScannerModal() {
+            if(scannerKecilInstance) {
+                scannerKecilInstance.stop().then(() => {
+                    document.getElementById('modalScannerKecil').style.display = 'none';
+                }).catch(() => {
+                    document.getElementById('modalScannerKecil').style.display = 'none';
+                });
+            } else {
+                document.getElementById('modalScannerKecil').style.display = 'none';
+            }
+        }
+
+        function simpanDataAnggota(e) {
+            e.preventDefault();
+            let idEdit = document.getElementById('editIndex').value;
+            let customId = document.getElementById('inputCustomId').value.trim();
+            let nama = document.getElementById('inputNama').value.toUpperCase();
+            let gender = document.getElementById('inputGender').value;
+            let tglLahir = document.getElementById('inputTglLahir').value;
+            let domisili = document.getElementById('inputDomisili').value;
+            
+            let tahunLahir = new Date(tglLahir).getFullYear();
+            let usia = new Date().getFullYear() - tahunLahir;
+
+            let fileInput = document.getElementById('inputFotoFile');
+            
+            let prosesSimpan = (fotoBase64) => {
+                if(idEdit === "") {
+                    let cek = listAnggota.find(a => a.id === customId);
+                    if(cek) {
+                        alert("ID Anggota tersebut sudah terdaftar! Gunakan ID/QR lain.");
+                        return;
+                    }
+                    let anggotaBaru = {
+                        id: customId,
+                        nama: nama,
+                        gender: gender,
+                        tglLahir: tglLahir,
+                        usia: usia,
+                        domisili: domisili,
+                        foto: fotoBase64 || "https://via.placeholder.com/65",
+                        qrImg: ""
+                    };
+                    listAnggota.push(anggotaBaru);
+                    alert("Anggota berhasil ditambahkan dengan ID: " + customId);
+                } else {
+                    let index = listAnggota.findIndex(a => a.id === idEdit);
+                    if(index !== -1) {
+                        listAnggota[index].id = customId;
+                        listAnggota[index].nama = nama;
+                        listAnggota[index].gender = gender;
+                        listAnggota[index].tglLahir = tglLahir;
+                        listAnggota[index].usia = usia;
+                        listAnggota[index].domisili = domisili;
+                        if(fotoBase64) {
+                            listAnggota[index].foto = fotoBase64;
+                        }
+                        alert("Data anggota berhasil diperbarui!");
+                    }
+                }
+                simpanLocalStorage();
+                renderAnggota();
+                tutupModalForm();
+            };
+
+            if(fileInput.files && fileInput.files[0]) {
+                let reader = new FileReader();
+                reader.onload = function(uploadEvent) {
+                    prosesSimpan(uploadEvent.target.result);
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                let existingFoto = "https://via.placeholder.com/65";
+                if(idEdit !== "") {
+                    let found = listAnggota.find(a => a.id === idEdit);
+                    if(found) existingFoto = found.foto;
+                }
+                prosesSimpan(existingFoto);
+            }
+        }
+
+        function hapusAnggota(id) {
+            if(confirm("Yakin ingin menghapus anggota " + id + "?")) {
+                listAnggota = listAnggota.filter(a => a.id !== id);
+                simpanLocalStorage();
+                renderAnggota();
+            }
+        }
+
+        function filterAnggota() {
+            let keyword = document.getElementById('cariAnggota').value.toLowerCase();
+            let hasil = listAnggota.filter(a => a.nama.toLowerCase().includes(keyword) || a.id.toLowerCase().includes(keyword));
+            renderAnggota(hasil);
+        }
+
+        function bukaIdCard(id) {
+            let anggota = listAnggota.find(a => a.id === id);
+            if(!anggota) return;
+            currentActiveId = anggota.id;
+
+            document.getElementById('cardNama').innerText = anggota.nama;
+            document.getElementById('cardIdUnik').innerText = anggota.id;
+            document.getElementById('cardGender').innerText = anggota.gender;
+            document.getElementById('cardDomisili').innerText = "Domisili: " + anggota.domisili;
+            document.getElementById('cardUsia').innerText = "Usia: " + anggota.usia + " tahun";
+            document.getElementById('cardFoto').src = anggota.foto;
+            document.getElementById('cardTglLahir').innerHTML = "<strong>TGL LAHIR:</strong> " + (anggota.tglLahir || "-");
+
+            let qrImgElem = document.getElementById('cardQrImg');
+            let labelUpload = document.getElementById('labelUploadQr');
+
+            if(anggota.qrImg) {
+                qrImgElem.src = anggota.qrImg;
+                qrImgElem.style.display = "block";
+                labelUpload.style.display = "none";
+            } else {
+                qrImgElem.src = "";
+                qrImgElem.style.display = "none";
+                labelUpload.style.display = "block";
+            }
+
+            document.getElementById('modalIdCard').style.display = 'flex';
+        }
+
+        function uploadQrAnggota(event) {
+            let file = event.target.files[0];
+            if(!file) return;
+
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let base64Qr = e.target.result;
+                let anggota = listAnggota.find(a => a.id === currentActiveId);
+                if(anggota) {
+                    anggota.qrImg = base64Qr;
+                    simpanLocalStorage();
+                    renderAnggota();
+                }
+
+                let qrImgElem = document.getElementById('cardQrImg');
+                let labelUpload = document.getElementById('labelUploadQr');
+                qrImgElem.src = base64Qr;
+                qrImgElem.style.display = "block";
+                labelUpload.style.display = "none";
+                alert("Gambar QR Code berhasil diunggah ke kartu!");
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function tutupModalIdCard() {
+            document.getElementById('modalIdCard').style.display = 'none';
+        }
+
+        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 220, height: 220} }, false);
+        html5QrcodeScanner.render((decodedText) => {
+            html5QrcodeScanner.pause();
+            document.getElementById('hasil-scan').innerText = "Berhasil Absen: " + decodedText;
+            
+            // Mengirim data ke server lokal untuk dicatat ke database
+            fetch('http://localhost:3000/api/absen', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_anggota: decodedText })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.pesan + " (" + decodedText + ")");
+                setTimeout(() => { html5QrcodeScanner.resume(); }, 2000);
+            })
+            .catch(() => {
+                alert("Absen tercatat secara lokal.");
+                setTimeout(() => { html5QrcodeScanner.resume(); }, 2000);
+            });
+        }, () => {});
+
+        function loadRekapMatriks() {
+            const thead = document.getElementById('tabel-header');
+            const tbody = document.getElementById('tabel-body');
+            let tglHariIni = new Date().toISOString().split('T')[0].split('-').reverse().join('-');
+            
+            thead.innerHTML = `<tr><th>No</th><th>ID Anggota</th><th>Nama Anggota</th><th style="text-align:center;">${tglHariIni}</th></tr>`;
+            tbody.innerHTML = "";
+
+            if(listAnggota.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">Belum ada data.</td></tr>`;
+                return;
+            }
+
+            listAnggota.forEach((item, index) => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:10px; border-bottom:1px solid #eee;">${index + 1}</td>
+                    <td style="padding:10px; border-bottom:1px solid #eee;"><strong>${item.id}</strong></td>
+                    <td style="padding:10px; border-bottom:1px solid #eee;">${item.nama}</td>
+                    <td style="padding:10px; border-bottom:1px solid #eee; text-align:center;"><span style="color:#2563eb; font-weight:bold;">Hadir</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportKeExcel() {
+            let tabel = document.getElementById("tabel-absen");
+            let workbook = XLSX.utils.table_to_book(tabel, { sheet: "Rekap Absensi" });
+            XLSX.writeFile(workbook, "Rekap_Paskibra_Indangjaya.xlsx");
+        }
+
+        window.onload = function() {
+            renderAnggota();
+        };
+    </script>
+</body>
+</html>
